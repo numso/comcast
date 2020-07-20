@@ -1,7 +1,7 @@
 // shim browser env
 var listeners = {}
-global.addEventListener = (type, func) => {
-  console.log('Adding event listener for:', type)
+global.addEventListener = function addEventListener (type, func) {
+  // console.log('Adding event listener for:', type)
   listeners[type] = func
   if (type === 'DOMContentLoaded') {
     const e = createEvent('CustomEvent')
@@ -9,11 +9,11 @@ global.addEventListener = (type, func) => {
     dispatchEvent(e)
   }
 }
-global.removeEventListener = (type, _func) => {
-  console.log('Removing event listener for:', type)
+global.removeEventListener = function removeEventListener (type, _func) {
+  // console.log('Removing event listener for:', type)
   delete listeners[type]
 }
-global.createEvent = event => {
+global.createEvent = function createEvent (event) {
   if (event !== 'CustomEvent') throw new Error(`Unknown Event Type: ${event}`)
   let e = {
     initCustomEvent (type, canBubble, cancelable, detail) {
@@ -23,26 +23,38 @@ global.createEvent = event => {
   }
   return e
 }
-global.dispatchEvent = event => {
-  console.log('Firing event for:', event.type)
+global.dispatchEvent = function dispatchEvent (event) {
+  // console.log('Firing event for:', event.type)
   if (event.type in listeners) listeners[event.type](event)
-  else console.log('FAILED')
+  else console.log(`----- Failed to fire event ${event.type} -----`)
 }
 global.document = {
   addEventListener: global.addEventListener,
   removeEventListener: global.removeEventListener,
   createEvent: global.createEvent
 }
-// const debug = () => null
-const debug = console.log
+let count = 0
+let debugCode = 0
+const fmt = a => {
+  if (typeof a === 'function') return `<${a.name || 'unnamedFunc'}>`
+  return a
+}
+const pad = (num, count) => `${num}`.padStart(count, '0')
+const debug = ({ debugCode }, op, msg) => {
+  if (!process.env.DEBUG) return
+  ++count
+  if (process.env.COUNT && count >= parseInt(process.env.COUNT, 10)) return
+  if (process.env.OP && parseInt(process.env.OP, 10) !== op) return
+  const prefix = `${pad(count, 5)} VM ${pad(debugCode, 3)} OP ${pad(op, 2)}`
+  console.log(msg ? `${prefix}: ${msg}` : prefix)
+}
 // end shim browser env
 
 ;(function a (b) {
-  var c = {}
-  var d = {}
+  var HALT = {}
+  var CONTINUE = {}
   var n = Object.call.bind(Object.bind, Object.call)
   var o = n(Object.apply)
-  var t = n([].push)
   const H = require('./H')
   const J = require('./J')
   const K = require('./K')
@@ -65,7 +77,7 @@ const debug = console.log
     return result
   }
 
-  class Somefing {
+  class Registers {
     data = []
 
     clear (index) {
@@ -81,23 +93,25 @@ const debug = console.log
     }
 
     clone () {
-      var child = new Somefing()
+      var child = new Registers()
       child.data = this.data.slice(0)
       return child
     }
   }
 
-  class RunnerThing {
+  class VM {
     stack = []
     stack2 = []
     stack3 = []
     T = undefined
     K = 0
 
-    constructor (bj, bk, somefing, bm) {
+    debugCode = debugCode++
+
+    constructor (bj, bk, registers, bm) {
       this.G = bk
       this.M = bj
-      this.somefing = somefing
+      this.registers = registers
       this.c = bm == null ? b : Object(bm)
       this.i = bm
     }
@@ -123,582 +137,585 @@ const debug = console.log
       )
     }
   }
-  function tryToRun (func, runnerThing) {
+  function tryToRun (func, vm) {
     try {
-      func(runnerThing)
+      func(vm)
     } catch (error) {
-      errorHandler(error, runnerThing)
+      errorHandler(error, vm)
     }
   }
-  function errorHandler (error, runnerThing) {
-    var bw = runnerThing.stack3.pop()
+  function errorHandler (error, vm) {
+    var bw = vm.stack3.pop()
     for (var index = 0; index < bw.h; ++index) {
-      runnerThing.stack2.pop()
+      vm.stack2.pop()
     }
-    runnerThing.stack2.push({ v: true, O: error })
-    runnerThing.M = bw.W
-    runnerThing.G = bw.G
+    vm.stack2.push({ v: true, O: error })
+    vm.M = bw.W
+    vm.G = bw.G
   }
   var commands = [
-    function (runnerThing) {
-      debug(`OP 0: Checking if ${dE} is in ${dD}`)
-      var dD = runnerThing.stack.pop()
-      var dE = runnerThing.stack.pop()
-      runnerThing.stack.push(dE in dD)
+    function (vm) {
+      var dD = vm.stack.pop()
+      var dE = vm.stack.pop()
+      debug(vm, 0, `${dE} in ${dD} = ${dE in dD}`)
+      vm.stack.push(dE in dD)
     },
-    function (runnerThing) {
-      debug(`OP 1`)
-      var dG = H[runnerThing.getInstruction2()]
+    function (vm) {
+      debug(vm, 1)
+      var dG = H[vm.getInstruction2()]
       var dH = RegExp(dG)
-      runnerThing.stack.push(dH)
+      vm.stack.push(dH)
     },
-    function (runnerThing) {
-      debug(`OP 2`)
-      var dJ = runnerThing.stack.pop()
-      var dK = runnerThing.stack.pop()
-      runnerThing.stack.push(dK >= dJ)
+    function (vm) {
+      var dJ = vm.stack.pop()
+      var dK = vm.stack.pop()
+      debug(vm, 2, `${dK} >= ${dJ} = ${dK >= dJ}`)
+      vm.stack.push(dK >= dJ)
     },
-    function (runnerThing) {
-      debug(`OP 3`)
-      var dM = runnerThing.stack.pop()
-      runnerThing.stack.push(Number(dM))
+    function (vm) {
+      var dM = vm.stack.pop()
+      debug(vm, 3, `Number(${dM}) = ${Number(dM)}`)
+      vm.stack.push(Number(dM))
     },
-    function (runnerThing) {
-      debug(`OP 4`)
-      var dO = runnerThing.stack.pop()
-      runnerThing.stack.push(String(dO))
+    function (vm) {
+      var dO = vm.stack.pop()
+      debug(vm, 4, `String(${dO}) = ${String(dO)}`)
+      vm.stack.push(String(dO))
     },
-    function (runnerThing) {
-      debug(`OP 5`)
-      var dQ = runnerThing.getInstruction2()
-      var dR = runnerThing.getInstruction()
-      if (!runnerThing.stack.pop()) {
-        runnerThing.M = dQ
-        runnerThing.G = dR
+    function (vm) {
+      debug(vm, 5)
+      var dQ = vm.getInstruction2()
+      var dR = vm.getInstruction()
+      if (!vm.stack.pop()) {
+        vm.M = dQ
+        vm.G = dR
       }
     },
-    function (runnerThing) {
-      debug(`OP 6`)
-      var dT = runnerThing.getInstruction()
-      var dU = runnerThing.stack.splice(runnerThing.stack.length - dT, dT)
-      var dV = runnerThing.stack.pop()
-      var dW = runnerThing.stack.pop()
-      runnerThing.stack.push(o(dV, dW, dU))
+    function (vm) {
+      debug(vm, 6)
+      var dT = vm.getInstruction()
+      var dU = vm.stack.splice(vm.stack.length - dT, dT)
+      var dV = vm.stack.pop()
+      var dW = vm.stack.pop()
+      vm.stack.push(o(dV, dW, dU))
     },
-    function (runnerThing) {
-      debug(`OP 7`)
-      var dY = runnerThing.stack.pop()
-      var dZ = runnerThing.stack.pop()
-      var ea = runnerThing.stack.pop()
-      var eb = runnerThing.stack.pop()
-      var ec = runnerThing.stack.pop()
-      var ed = runnerThing.stack.pop()
-      var ee = runnerThing.stack.pop()
-      var ef = runnerThing.stack.pop()
-      var eg = runnerThing.stack.pop()
-      var eh = runnerThing.stack.pop()
-      var ei = runnerThing.stack.pop()
-      var ej = runnerThing.stack.pop()
-      var ek = runnerThing.stack.pop()
-      var el = runnerThing.stack.pop()
-      runnerThing.stack.push(
-        new el(ek, ej, ei, eh, eg, ef, ee, ed, ec, eb, ea, dZ, dY)
-      )
+    function (vm) {
+      debug(vm, 7)
+      var dY = vm.stack.pop()
+      var dZ = vm.stack.pop()
+      var ea = vm.stack.pop()
+      var eb = vm.stack.pop()
+      var ec = vm.stack.pop()
+      var ed = vm.stack.pop()
+      var ee = vm.stack.pop()
+      var ef = vm.stack.pop()
+      var eg = vm.stack.pop()
+      var eh = vm.stack.pop()
+      var ei = vm.stack.pop()
+      var ej = vm.stack.pop()
+      var ek = vm.stack.pop()
+      var el = vm.stack.pop()
+      vm.stack.push(new el(ek, ej, ei, eh, eg, ef, ee, ed, ec, eb, ea, dZ, dY))
     },
-    function (runnerThing) {
-      debug(`OP 8`)
-      var en = runnerThing.stack.pop()
+    function (vm) {
+      debug(vm, 8)
+      var en = vm.stack.pop()
       var eo = []
       for (var ep in en) {
-        t(eo, ep)
+        eo.push(ep)
       }
-      runnerThing.stack.push(eo)
+      vm.stack.push(eo)
     },
-    function (runnerThing) {
-      debug(`OP 9`)
-      --runnerThing.stack3[runnerThing.stack3.length - 1].h
+    function (vm) {
+      debug(vm, 9)
+      --vm.stack3[vm.stack3.length - 1].h
     },
-    function (runnerThing) {
-      debug(`OP 10`)
-      var es = runnerThing.getInstruction()
-      var et = runnerThing.getInstruction()
-      if (runnerThing.stack.pop()) {
-        runnerThing.M = es
-        runnerThing.G = et
+    function (vm) {
+      debug(vm, 10)
+      var es = vm.getInstruction()
+      var et = vm.getInstruction()
+      if (vm.stack.pop()) {
+        vm.M = es
+        vm.G = et
       }
     },
-    function (runnerThing) {
-      debug(`OP 11`)
-      var ev = runnerThing.stack.pop()
-      var ew = runnerThing.stack.pop()
-      runnerThing.stack.push(new ew(ev))
+    function (vm) {
+      debug(vm, 11)
+      var ev = vm.stack.pop()
+      var ew = vm.stack.pop()
+      vm.stack.push(new ew(ev))
     },
-    function (runnerThing) {
-      debug(`OP 12`)
-      var ey = runnerThing.stack.pop()
-      var ez = runnerThing.stack.pop()
-      runnerThing.stack.push(ez - ey)
+    function (vm) {
+      var ey = vm.stack.pop()
+      var ez = vm.stack.pop()
+      debug(vm, 12, `${ez} - ${ey} = ${ez - ey}`)
+      vm.stack.push(ez - ey)
     },
-    function (runnerThing) {
-      debug(`OP 13`)
-      var eB = runnerThing.stack.pop()
-      var eC = runnerThing.stack.pop()
-      var eD = runnerThing.stack.pop()
-      runnerThing.stack.push(new eD(eC, eB))
+    function (vm) {
+      debug(vm, 13)
+      var eB = vm.stack.pop()
+      var eC = vm.stack.pop()
+      var eD = vm.stack.pop()
+      vm.stack.push(new eD(eC, eB))
     },
-    function (runnerThing) {
-      debug(`OP 14`)
-      var eF = runnerThing.stack.pop()
-      var eG = runnerThing.stack.pop()
-      runnerThing.stack.push(eG | eF)
+    function (vm) {
+      var eF = vm.stack.pop()
+      var eG = vm.stack.pop()
+      debug(vm, 14, `${eG} | ${eF} = ${eG | eF}`)
+      vm.stack.push(eG | eF)
     },
-    function (runnerThing) {
-      debug(`OP 15`)
-      var eI = runnerThing.stack.pop()
-      var eJ = runnerThing.stack.pop()
-      runnerThing.stack.push(delete eJ[eI])
+    function (vm) {
+      debug(vm, 15)
+      var eI = vm.stack.pop()
+      var eJ = vm.stack.pop()
+      vm.stack.push(delete eJ[eI])
     },
-    function (runnerThing) {
-      debug(`OP 16`)
-      var eL = runnerThing.stack.pop()
-      var eM = runnerThing.stack.pop()
-      runnerThing.stack.push(eM > eL)
+    function (vm) {
+      var eL = vm.stack.pop()
+      var eM = vm.stack.pop()
+      debug(vm, 16, `${eM} > ${eL} = ${eM > eL}`)
+      vm.stack.push(eM > eL)
     },
-    function (runnerThing) {
-      debug(`OP 17`)
-      var eO = runnerThing.getInstruction2()
-      var eP = runnerThing.getInstruction()
-      runnerThing.K = {
-        M: runnerThing.M,
-        G: runnerThing.G
+    function (vm) {
+      debug(vm, 17)
+      var eO = vm.getInstruction2()
+      var eP = vm.getInstruction()
+      vm.K = {
+        M: vm.M,
+        G: vm.G
       }
-      runnerThing.M = eO
-      runnerThing.G = eP
+      vm.M = eO
+      vm.G = eP
     },
-    function (runnerThing) {
-      debug(`OP 18`)
-      var eR = runnerThing.getInstruction2()
-      var eS = runnerThing.getInstruction()
-      runnerThing.stack3.push({ W: eR, G: eS, h: 0 })
+    function (vm) {
+      debug(vm, 18)
+      var eR = vm.getInstruction2()
+      var eS = vm.getInstruction()
+      vm.stack3.push({ W: eR, G: eS, h: 0 })
     },
-    function (runnerThing) {
-      debug(`OP 19`)
-      var eU = runnerThing.stack.pop()
-      var eV = runnerThing.stack.pop()
-      runnerThing.stack.push(eV >>> eU)
+    function (vm) {
+      var eU = vm.stack.pop()
+      var eV = vm.stack.pop()
+      debug(vm, 19, `${eV} >>> ${eU} = ${eV - eU}`)
+      vm.stack.push(eV >>> eU)
     },
-    function (runnerThing) {
-      debug(`OP 20: FAIL`)
-      runnerThing.stack.push(function () {
+    function (vm) {
+      debug(vm, 20, `FAIL FANTASTICALLY`)
+      vm.stack.push(function () {
         null[0]()
       })
     },
-    function (runnerThing) {
-      debug(`OP 21`)
-      var eY = runnerThing.stack.pop()
-      var eZ = runnerThing.stack.pop()
-      runnerThing.stack.push(eZ * eY)
+    function (vm) {
+      var eY = vm.stack.pop()
+      var eZ = vm.stack.pop()
+      debug(vm, 21, `${eZ} * ${eY} = ${eZ - eY}`)
+      vm.stack.push(eZ * eY)
     },
-    function (runnerThing) {
-      debug(`OP 22`)
-      var fb = runnerThing.stack.pop()
-      var fc = runnerThing.stack.pop()
-      var fd = runnerThing.stack.pop()
-      runnerThing.stack.push(fd(fc, fb))
+    function (vm) {
+      var fb = vm.stack.pop()
+      var fc = vm.stack.pop()
+      var fd = vm.stack.pop()
+      var res = fd(fc, fb)
+      debug(vm, 22, `fn/2 ${fmt(fd)}(${fmt(fc)}, ${fmt(fb)}) = ${res}`)
+      vm.stack.push(res)
     },
-    function (runnerThing) {
-      debug(`OP 23`)
-      var ff = runnerThing.getInstruction2()
-      var fg = next_instruction(ff, runnerThing.somefing)
-      runnerThing.stack.push(fg)
+    function (vm) {
+      var ff = vm.getInstruction2()
+      var fg = run_subroutine(ff, vm.registers)
+      debug(vm, 23, `run_subroutine<instr2>(${ff}) = ${fmt(fg)}`)
+      vm.stack.push(fg)
     },
-    function (runnerThing) {
-      debug(`OP 24`)
-      var fj = runnerThing.stack.pop()
-      runnerThing.stack.push(!fj)
+    function (vm) {
+      var fj = vm.stack.pop()
+      debug(vm, 24, `!${fmt(fj)} = ${!fj}`)
+      vm.stack.push(!fj)
     },
-    function (runnerThing) {
-      debug(`OP 25`)
-      var fl = runnerThing.getInstruction2()
-      var fm = runnerThing.getInstruction()
-      runnerThing.M = fl
-      runnerThing.G = fm
+    function (vm) {
+      debug(vm, 25)
+      var fl = vm.getInstruction2()
+      var fm = vm.getInstruction()
+      vm.M = fl
+      vm.G = fm
     },
-    function (runnerThing) {
-      debug(`OP 26`)
-      var fo = runnerThing.stack.pop()
-      var fp = runnerThing.stack.pop()
-      runnerThing.stack.push(fp[fo])
+    function (vm) {
+      debug(vm, 26)
+      var fo = vm.stack.pop()
+      var fp = vm.stack.pop()
+      vm.stack.push(fp[fo])
     },
-    function (runnerThing) {
-      debug(`OP 27`)
-      var fr = runnerThing.getInstruction()
-      var fs = runnerThing.getInstruction()
-      if (!runnerThing.stack.pop()) {
-        runnerThing.M = fr
-        runnerThing.G = fs
+    function (vm) {
+      debug(vm, 27)
+      var fr = vm.getInstruction()
+      var fs = vm.getInstruction()
+      if (!vm.stack.pop()) {
+        vm.M = fr
+        vm.G = fs
       }
     },
-    function (runnerThing) {
-      debug(`OP 28`)
-      runnerThing.M = runnerThing.K.M
-      runnerThing.G = runnerThing.K.G
+    function (vm) {
+      debug(vm, 28)
+      vm.M = vm.K.M
+      vm.G = vm.K.G
     },
-    function (runnerThing) {
-      debug(`OP 29`)
-      var fv = runnerThing.stack.pop()
-      var fw = runnerThing.stack.pop()
-      var fx = runnerThing.stack.pop()
-      var fy = runnerThing.stack.pop()
-      runnerThing.stack.push(fy(fx, fw, fv))
+    function (vm) {
+      debug(vm, 29)
+      var fv = vm.stack.pop()
+      var fw = vm.stack.pop()
+      var fx = vm.stack.pop()
+      var fy = vm.stack.pop()
+      vm.stack.push(fy(fx, fw, fv))
     },
-    function (runnerThing) {
-      debug(`OP 30`)
-      var fA = runnerThing.getInstruction()
-      var fB = runnerThing.stack2.pop()
-      runnerThing.somefing.set(fA, fB.O)
+    function (vm) {
+      debug(vm, 30)
+      var fA = vm.getInstruction()
+      var fB = vm.stack2.pop()
+      vm.registers.set(fA, fB.O)
     },
-    function (runnerThing) {
-      debug(`OP 31`)
-      var fD = H[runnerThing.getInstruction2()]
-      runnerThing.stack.push(typeof b[fD])
+    function (vm) {
+      debug(vm, 31)
+      var fD = H[vm.getInstruction2()]
+      vm.stack.push(typeof b[fD])
     },
-    function (runnerThing) {
-      debug(`OP 32`)
-      var fF = runnerThing.getInstruction2()
-      var fG = runnerThing.getInstruction()
-      if (runnerThing.stack.pop()) {
-        runnerThing.M = fF
-        runnerThing.G = fG
+    function (vm) {
+      debug(vm, 32)
+      var fF = vm.getInstruction2()
+      var fG = vm.getInstruction()
+      if (vm.stack.pop()) {
+        vm.M = fF
+        vm.G = fG
       }
     },
-    function (runnerThing) {
-      debug(`OP 33`)
-      var fI = runnerThing.stack.pop()
-      var fJ = runnerThing.stack.pop()
-      runnerThing.stack.push(fJ(fI))
+    function (vm) {
+      debug(vm, 33)
+      var fI = vm.stack.pop()
+      var fJ = vm.stack.pop()
+      vm.stack.push(fJ(fI))
     },
-    function (runnerThing) {
-      debug(`OP 34`)
-      var fL = runnerThing.stack.pop()
-      runnerThing.stack.push(fL())
+    function (vm) {
+      debug(vm, 34)
+      var fL = vm.stack.pop()
+      vm.stack.push(fL())
     },
-    function (runnerThing) {
-      debug(`OP 35`)
-      var fN = runnerThing.stack.pop()
-      var fO = runnerThing.stack.pop()
-      runnerThing.stack.push(fO < fN)
+    function (vm) {
+      var fN = vm.stack.pop()
+      var fO = vm.stack.pop()
+      debug(vm, 35, `${fO} < ${fN} = ${fO < fN}`)
+      vm.stack.push(fO < fN)
     },
-    function (runnerThing) {
-      debug(`OP 36`)
-      var fQ = H[runnerThing.getInstruction2()]
+    function (vm) {
+      var fQ = H[vm.getInstruction2()]
+      debug(vm, 36, `global.${fQ}`)
       if (!(fQ in b)) throw new ReferenceError(fQ + ' is not defined.')
-      runnerThing.stack.push(b[fQ])
+      vm.stack.push(b[fQ])
     },
-    function (runnerThing) {
-      debug(`OP 37`)
-      var fS = runnerThing.stack.pop()
-      var fT = runnerThing.stack.pop()
-      runnerThing.stack.push(fT % fS)
+    function (vm) {
+      var fS = vm.stack.pop()
+      var fT = vm.stack.pop()
+      debug(vm, 37, `${fT} % ${fS} = ${fT % fS}`)
+      vm.stack.push(fT % fS)
     },
-    function (runnerThing) {
-      debug(`OP 38`)
-      var fV = runnerThing.stack.pop()
-      runnerThing.stack.push(-fV)
+    function (vm) {
+      var fV = vm.stack.pop()
+      debug(vm, 38, `negate ${fV} = ${-fV}`)
+      vm.stack.push(-fV)
     },
-    function (runnerThing) {
-      debug(`OP 39`)
-      runnerThing.stack.push(null)
+    function (vm) {
+      debug(vm, 39, `null`)
+      vm.stack.push(null)
     },
-    function (runnerThing) {
-      debug(`OP 40`)
-      var fY = runnerThing.getInstruction2()
-      runnerThing.stack.push(fY)
+    function (vm) {
+      debug(vm, 40)
+      var fY = vm.getInstruction2()
+      vm.stack.push(fY)
     },
-    function (runnerThing) {
-      debug(`OP 41`)
-      var ga = runnerThing.stack.pop()
-      var gb = runnerThing.stack.pop()
-      runnerThing.stack.push(gb / ga)
+    function (vm) {
+      var ga = vm.stack.pop()
+      var gb = vm.stack.pop()
+      debug(vm, 41, `${gb} / ${ga} = ${gb / ga}`)
+      vm.stack.push(gb / ga)
     },
-    function (runnerThing) {
-      debug(`OP 42`)
-      throw runnerThing.stack.pop()
+    function (vm) {
+      debug(vm, 42)
+      throw vm.stack.pop()
     },
-    function (runnerThing) {
-      debug(`OP 43`)
-      runnerThing.stack.push([])
+    function (vm) {
+      debug(vm, 43)
+      vm.stack.push([])
     },
-    function (runnerThing) {
-      debug(`OP 44`)
-      var gf = runnerThing.stack2.pop()
+    function (vm) {
+      debug(vm, 44)
+      var gf = vm.stack2.pop()
       if (gf.v) throw gf.O
-      runnerThing.M = gf.O
-      runnerThing.G = gf.G
+      vm.M = gf.O
+      vm.G = gf.G
     },
-    function (runnerThing) {
-      debug(`OP 45`)
-      var gh = L[runnerThing.getInstruction()]
-      runnerThing.stack.push(gh)
+    function (vm) {
+      debug(vm, 45)
+      var gh = L[vm.getInstruction()]
+      vm.stack.push(gh)
     },
-    function (runnerThing) {
-      debug(`OP 46`)
-      runnerThing.stack3.pop()
+    function (vm) {
+      debug(vm, 46)
+      vm.stack3.pop()
     },
-    function (runnerThing) {
-      debug(`OP 47`)
-      var gk = runnerThing.stack.pop()
-      var gl = runnerThing.stack.pop()
+    function (vm) {
+      debug(vm, 47)
+      var gk = vm.stack.pop()
+      var gl = vm.stack.pop()
       Object.defineProperty(gl, gk, {
         writable: true,
         configurable: true,
         enumerable: true,
-        value: runnerThing.stack.pop()
+        value: vm.stack.pop()
       })
     },
-    function (runnerThing) {
-      debug(`OP 48`)
-      var gn = runnerThing.stack.pop()
+    function (vm) {
+      debug(vm, 48)
+      var gn = vm.stack.pop()
       if (gn === null || gn === undefined) {
         throw new TypeError('Cannot access property of ' + gn)
       }
     },
-    function (runnerThing) {
-      debug(`OP 49`)
-      var gp = runnerThing.stack.pop()
-      var gq = runnerThing.stack.pop()
-      runnerThing.stack.push(gq == gp)
+    function (vm) {
+      debug(vm, 49)
+      var gp = vm.stack.pop()
+      var gq = vm.stack.pop()
+      vm.stack.push(gq == gp)
     },
-    function (runnerThing) {
-      debug(`OP 50`)
-      var gs = H[runnerThing.getInstruction2()]
-      runnerThing.stack.push(gs)
+    function (vm) {
+      var gs = H[vm.getInstruction2()]
+      debug(vm, 50, `Pull from H = ${gs}`)
+      vm.stack.push(gs)
     },
-    function (runnerThing) {
-      debug(`OP 51`)
-      var gu = runnerThing.getInstruction3()
-      runnerThing.stack.push(gu)
+    function (vm) {
+      debug(vm, 51)
+      var gu = vm.getInstruction3()
+      vm.stack.push(gu)
     },
-    function (runnerThing) {
-      debug(`OP 52`)
-      var gw = runnerThing.stack.pop()
-      var gx = runnerThing.stack.pop()
-      runnerThing.stack.push(gx[gw]())
+    function (vm) {
+      debug(vm, 52)
+      var gw = vm.stack.pop()
+      var gx = vm.stack.pop()
+      vm.stack.push(gx[gw]())
     },
-    function (runnerThing) {
-      debug(`OP 53`)
-      var gz = runnerThing.stack.pop()
-      var gA = runnerThing.stack.pop()
-      runnerThing.stack.push(gA instanceof gz)
+    function (vm) {
+      var gz = vm.stack.pop()
+      var gA = vm.stack.pop()
+      debug(vm, 53, `${gA} instanceof ${gz} = ${gA instanceof gz}`)
+      vm.stack.push(gA instanceof gz)
     },
-    function (runnerThing) {
-      debug(`OP 54`)
-      var gC = runnerThing.stack.pop()
-      runnerThing.stack.push(new gC())
+    function (vm) {
+      var gC = vm.stack.pop()
+      debug(vm, 54, `instantiate ${fmt(gC)}`)
+      vm.stack.push(new gC())
     },
-    function (runnerThing) {
-      debug(`OP 55: Clear Stack`)
-      runnerThing.stack = []
+    function (vm) {
+      debug(vm, 55, `Clear Stack`)
+      vm.stack = []
     },
-    function (runnerThing) {
-      debug(`OP 56`)
-      var gF = runnerThing.getInstruction2()
-      runnerThing.somefing.set(gF, runnerThing.stack.pop())
+    function (vm) {
+      debug(vm, 56)
+      var gF = vm.getInstruction2()
+      vm.registers.set(gF, vm.stack.pop())
     },
-    function (runnerThing) {
-      debug(`OP 57: Regex Evaluation ${gH} ${gi}`)
-      var gH = runnerThing.stack.pop()
-      var gI = runnerThing.stack.pop()
+    function (vm) {
+      var gH = vm.stack.pop()
+      var gI = vm.stack.pop()
       var gJ = RegExp(gH, gI)
-      runnerThing.stack.push(gJ)
+      debug(vm, 57, `RegExp(${gH}, ${gI})`)
+      vm.stack.push(gJ)
     },
-    function (runnerThing) {
-      debug(`OP 58`)
-      var gL = runnerThing.getInstruction()
-      var gM = runnerThing.somefing.get(gL)
-      runnerThing.stack.push(gM)
+    function (vm) {
+      var gL = vm.getInstruction()
+      var gM = vm.registers.get(gL)
+      debug(vm, 58, `RegisterRead: r[${gL}] = ${fmt(gM)}`)
+      vm.stack.push(gM)
     },
-    function (runnerThing) {
-      debug(`OP 59`)
-      var gO = runnerThing.stack3.pop()
-      var gP = {
-        v: false,
-        O: runnerThing.M,
-        G: runnerThing.G
-      }
-      runnerThing.stack2.push(gP)
-      runnerThing.M = gO.W
-      runnerThing.G = gO.G
+    function (vm) {
+      debug(vm, 59)
+      var gO = vm.stack3.pop()
+      var gP = { v: false, O: vm.M, G: vm.G }
+      vm.stack2.push(gP)
+      vm.M = gO.W
+      vm.G = gO.G
     },
-    function (runnerThing) {
-      debug(`OP 60: REPLICATE TEH WORLD`)
-      runnerThing.stack.push(a)
+    function (vm) {
+      debug(vm, 60, `REPLICATE TEH WORLD`)
+      vm.stack.push(a)
     },
-    function (runnerThing) {
-      debug(`OP 61: is ${gT} === ${gS}`)
-      var gS = runnerThing.stack.pop()
-      var gT = runnerThing.stack.pop()
-      runnerThing.stack.push(gT === gS)
+    function (vm) {
+      var gS = vm.stack.pop()
+      var gT = vm.stack.pop()
+      debug(vm, 61, `${gT} === ${gS} = ${gT === gS}`)
+      vm.stack.push(gT === gS)
     },
-    function (runnerThing) {
-      debug(`OP 62: is ${gW} <= ${gV}`)
-      var gV = runnerThing.stack.pop()
-      var gW = runnerThing.stack.pop()
-      runnerThing.stack.push(gW <= gV)
+    function (vm) {
+      var gV = vm.stack.pop()
+      var gW = vm.stack.pop()
+      debug(vm, 62, `${gW} <= ${gV} = ${gW <= gV}`)
+      vm.stack.push(gW <= gV)
     },
-    function (runnerThing) {
-      debug(`OP 63`)
-      var gY = runnerThing.stack.pop()
-      var gZ = runnerThing.stack.pop()
-      var ha = runnerThing.stack.pop()
+    function (vm) {
+      debug(vm, 63)
+      var gY = vm.stack.pop()
+      var gZ = vm.stack.pop()
+      var ha = vm.stack.pop()
       gZ[gY] = ha
     },
-    function (runnerThing) {
-      debug(`OP 64`)
-      var hc = runnerThing.stack.pop()
-      var hd = runnerThing.stack.pop()
-      runnerThing.stack.push(hd >> hc)
+    function (vm) {
+      debug(vm, 64)
+      var hc = vm.stack.pop()
+      var hd = vm.stack.pop()
+      vm.stack.push(hd >> hc)
     },
-    function (runnerThing) {
-      debug(`OP 65`)
-      var hf = runnerThing.stack.pop()
-      var hg = runnerThing.stack.pop()
-      var hh = runnerThing.stack.pop()
-      var hi = runnerThing.stack.pop()
-      runnerThing.stack.push(new hi(hh, hg, hf))
+    function (vm) {
+      debug(vm, 65)
+      var hf = vm.stack.pop()
+      var hg = vm.stack.pop()
+      var hh = vm.stack.pop()
+      var hi = vm.stack.pop()
+      vm.stack.push(new hi(hh, hg, hf))
     },
-    function (runnerThing) {
-      debug(`OP 66`)
-      var hk = runnerThing.getInstruction()
-      runnerThing.somefing.set(hk, runnerThing.stack.pop())
+    function (vm) {
+      debug(vm, 66)
+      var hk = vm.getInstruction()
+      vm.registers.set(hk, vm.stack.pop())
     },
-    function (runnerThing) {
-      debug(`OP 67`)
-      var hm = runnerThing.getInstruction()
-      runnerThing.stack.push(hm)
+    function (vm) {
+      debug(vm, 67)
+      var hm = vm.getInstruction()
+      vm.stack.push(hm)
     },
-    function (runnerThing) {
-      debug(`OP 68: true`)
-      runnerThing.stack.push(true)
+    function (vm) {
+      debug(vm, 68, `true`)
+      vm.stack.push(true)
     },
-    function (runnerThing) {
-      debug(`OP 69`)
-      runnerThing.stack.push(runnerThing.c)
+    function (vm) {
+      debug(vm, 69)
+      vm.stack.push(vm.c)
     },
-    function (runnerThing) {
-      debug(`OP 70`)
-      var hq = runnerThing.stack.pop()
+    function (vm) {
+      debug(vm, 70)
+      var hq = vm.stack.pop()
       if (hq === null || hq === undefined) {
         throw new TypeError(hq + ' is not an object')
       }
-      runnerThing.stack.push(Object(hq))
+      vm.stack.push(Object(hq))
     },
-    function (runnerThing) {
-      debug(`OP 71`)
-      var hs = runnerThing.stack.pop()
-      runnerThing.stack[runnerThing.stack.length - 1] += hs
+    function (vm) {
+      debug(vm, 71)
+      var hs = vm.stack.pop()
+      vm.stack[vm.stack.length - 1] += hs
     },
-    function (runnerThing) {
-      debug(`OP 72`)
-      var hu = runnerThing.getInstruction()
-      var hv = next_instruction(hu, runnerThing.somefing)
-      runnerThing.stack.push(hv)
+    function (vm) {
+      var hu = vm.getInstruction()
+      var hv = run_subroutine(hu, vm.registers)
+      debug(vm, 72, `run_subroutine<instr>(${hu}) = ${fmt(hv)}`)
+      vm.stack.push(hv)
     },
-    function (runnerThing) {
-      debug(`OP 73`)
-      var hx = runnerThing.getInstruction2()
-      var hy = runnerThing.somefing.get(hx)
-      runnerThing.stack.push(hy)
+    function (vm) {
+      debug(vm, 73)
+      var hx = vm.getInstruction2()
+      var hy = vm.registers.get(hx)
+      vm.stack.push(hy)
     },
-    function (runnerThing) {
-      debug(`OP 74`)
-      var hA = runnerThing.stack.pop()
-      var hB = runnerThing.stack.pop()
-      runnerThing.stack.push(hB & hA)
+    function (vm) {
+      var hA = vm.stack.pop()
+      var hB = vm.stack.pop()
+      debug(vm, 74, `${hB} & ${hA} = ${hB & hA}`)
+      vm.stack.push(hB & hA)
     },
-    function (runnerThing) {
-      debug(`OP 75`)
-      var hD = runnerThing.getInstruction3()
-      var hE = runnerThing.getInstruction()
-      runnerThing.K = { M: runnerThing.M, G: runnerThing.G }
-      runnerThing.M = hD
-      runnerThing.G = hE
+    function (vm) {
+      debug(vm, 75)
+      var hD = vm.getInstruction3()
+      var hE = vm.getInstruction()
+      vm.K = { M: vm.M, G: vm.G }
+      vm.M = hD
+      vm.G = hE
     },
-    function (runnerThing) {
-      debug(`OP 76`)
-      runnerThing.stack.push(undefined)
+    function (vm) {
+      debug(vm, 76, 'undefined')
+      vm.stack.push(undefined)
     },
-    function (runnerThing) {
-      debug(`OP 77`)
-      runnerThing.stack.push(runnerThing.i)
+    function (vm) {
+      debug(vm, 77)
+      vm.stack.push(vm.i)
     },
-    function (runnerThing) {
-      debug(`OP 78`)
-      var hI = runnerThing.stack.pop()
-      runnerThing.stack.push(typeof hI)
+    function (vm) {
+      debug(vm, 78)
+      var hI = vm.stack.pop()
+      vm.stack.push(typeof hI)
     },
-    function (_runnerThing) {
-      globalUnknown1 = undefined
+    function (vm) {
+      debug(vm, 79, 'return undefined')
+      globalReturnValue = undefined
     },
-    function (runnerThing) {
-      debug(`OP 79`)
-      var hM = runnerThing.stack.pop()
-      var hN = runnerThing.stack.pop()
-      runnerThing.stack.push(hN !== hM)
+    function (vm) {
+      debug(vm, 80)
+      var hM = vm.stack.pop()
+      var hN = vm.stack.pop()
+      vm.stack.push(hN !== hM)
     },
-    function (runnerThing) {
-      debug(`OP 80`)
-      runnerThing.stack.pop()
+    function (vm) {
+      var popped = vm.stack.pop()
+      debug(vm, 81, `Pop stack (${fmt(popped)})`)
     },
-    function (runnerThing) {
-      debug(`OP 81`)
-      var hQ = runnerThing.stack.pop()
-      var hR = runnerThing.stack.pop()
-      runnerThing.stack.push(hR << hQ)
+    function (vm) {
+      debug(vm, 82)
+      var hQ = vm.stack.pop()
+      var hR = vm.stack.pop()
+      vm.stack.push(hR << hQ)
     },
-    function (runnerThing) {
-      debug(`OP 82`)
-      var hT = runnerThing.stack.pop()
-      var hU = runnerThing.stack.pop()
-      var hV = runnerThing.stack.pop()
-      var hW = runnerThing.stack.pop()
-      var hX = runnerThing.stack.pop()
-      runnerThing.stack.push(hX(hW, hV, hU, hT))
+    function (vm) {
+      var hT = vm.stack.pop()
+      var hU = vm.stack.pop()
+      var hV = vm.stack.pop()
+      var hW = vm.stack.pop()
+      var hX = vm.stack.pop()
+      var res = hX(hW, hV, hU, hT)
+      debug(
+        vm,
+        83,
+        `fn/4 ${fmt(hX)}(${fmt(hW)}, ${fmt(hV)}, ${fmt(hU)}, ${fmt(
+          hT
+        )}) = ${res}`
+      )
+      vm.stack.push(res)
     },
-    function (runnerThing) {
-      debug(`OP 83`)
-      var hZ = runnerThing.stack.pop()
-      var ia = runnerThing.stack.pop()
-      runnerThing.stack.push(ia != hZ)
+    function (vm) {
+      var hZ = vm.stack.pop()
+      var ia = vm.stack.pop()
+      debug(vm, 84, `${ia} != ${hZ} = ${ia != hZ}`)
+      vm.stack.push(ia != hZ)
     },
-    function (runnerThing) {
-      debug(`OP 84`)
-      ++runnerThing.stack3[runnerThing.stack3.length - 1].h
+    function (vm) {
+      debug(vm, 85)
+      ++vm.stack3[vm.stack3.length - 1].h
     },
-    function (runnerThing) {
-      debug(`OP 85`)
-      var id = runnerThing.getInstruction()
-      var ie = runnerThing.getInstruction()
-      runnerThing.M = id
-      runnerThing.G = ie
+    function (vm) {
+      var id = vm.getInstruction()
+      var ie = vm.getInstruction()
+      debug(vm, 86, `jump-instr M=${id} G=${ie}`)
+      vm.M = id
+      vm.G = ie
     },
-    function (runnerThing) {
-      debug(`OP 86`)
-      runnerThing.stack.push(runnerThing.stack[runnerThing.stack.length - 1])
+    function (vm) {
+      debug(vm, 87)
+      vm.stack.push(vm.stack[vm.stack.length - 1])
     },
-    function (runnerThing) {
-      debug(`OP 87`)
-      runnerThing.stack.push(false)
+    function (vm) {
+      debug(vm, 88, 'false')
+      vm.stack.push(false)
     },
-    function (runnerThing) {
-      debug(`OP 88`)
-      var ij = runnerThing.getInstruction2()
+    function (vm) {
+      var ij = vm.getInstruction2()
       var ik = I[ij]
       if (typeof ik !== 'undefined') {
-        runnerThing.stack[runnerThing.stack.length - 1] = ik
+        debug(vm, 89, `input (cache-hit) = ${ik}`)
+        vm.stack[vm.stack.length - 1] = ik
         return
       }
-      var il = runnerThing.stack.pop()
+      var il = vm.stack.pop()
       var im = H[ij]
       var io = parseProgram(im)
       var ip = parseProgram(il)
@@ -708,94 +725,89 @@ const debug = console.log
         ir += String.fromCharCode(ip[is] ^ io[is] ^ iq)
       }
       I[ij] = ir
-      runnerThing.stack.push(ir)
+      debug(vm, 89, `input (cache-miss) = ${ir}`)
+      vm.stack.push(ir)
     },
-    function (runnerThing) {
-      debug(`OP 89`)
-      var iu = runnerThing.stack.pop()
-      var iv = runnerThing.stack.pop()
-      runnerThing.M = iu
-      runnerThing.G = iv
+    function (vm) {
+      var iu = vm.stack.pop()
+      var iv = vm.stack.pop()
+      debug(vm, 90, `jump-stack M=${iu} G=${iv}`)
+      vm.M = iu
+      vm.G = iv
     },
-    function (_runnerThing) {
-      globalUnknown1 = c
+    function (vm) {
+      debug(vm, 91, 'return ???')
+      globalReturnValue = HALT
     },
-    function (runnerThing) {
-      debug(`OP 90`)
-      globalUnknown1 = runnerThing.stack.pop()
+    function (vm) {
+      var popped = vm.stack.pop()
+      debug(vm, 92, `return ${fmt(popped)};`)
+      globalReturnValue = popped
     },
-    function (runnerThing) {
-      debug(`OP 91`)
-      var iz = runnerThing.stack.pop()
-      var iA = runnerThing.stack.pop()
-      runnerThing.stack.push(iA ^ iz)
+    function (vm) {
+      var iz = vm.stack.pop()
+      var iA = vm.stack.pop()
+      debug(vm, 93, `${iA} ^ ${iz} = ${iA ^ iz}`)
+      vm.stack.push(iA ^ iz)
     },
-    function (runnerThing) {
-      debug(`OP 92: new empty object`)
-      runnerThing.stack.push({})
+    function (vm) {
+      debug(vm, 94, `{}`)
+      vm.stack.push({})
     }
   ]
-  function next_instruction (iC, somefing) {
+  function run_subroutine (iC, registers) {
     var iE = K[iC]
-    return run_program(iE.a, iE.u, somefing, iE.J, iE.V, iE.Z, iE.p, iE.C)
+    return run_program(iE.a, iE.u, registers, iE.J, iE.V, iE.Z, iE.p, iE.C)
   }
-  var globalUnknown1 = d
+  var globalReturnValue = CONTINUE
   var program = parseProgram(require('./program'))
-  function run_program (iG, iH, childSomefing, iJ, iK, iL, iM, iN) {
-    var somefing = new Somefing()
+  function run_program (iG, iH, oldRegisters, iJ, iK, iL, iM, iN) {
+    var registers = new Registers()
     var iS = iM !== undefined
     for (var index = 0; index < iK.length; ++index) {
-      somefing.data[iK[index]] = childSomefing.data[iK[index]]
+      registers.data[iK[index]] = oldRegisters.data[iK[index]]
     }
-    var iR = initiate(iG, iH, somefing, iJ, iL, iS, iM)
+    var iR = initiate(iG, iH, registers, iJ, iL, iS, iM)
     if (iN !== undefined) {
-      somefing.clear(iN)
-      somefing.set(iN, iR)
+      registers.clear(iN)
+      registers.set(iN, iR)
     }
     return iR
   }
-  function initiate (iU, iV, somefing, iX, iY, iZ, ja) {
+  function initiate (iU, iV, registers, iX, iY, iZ, ja) {
     var jb = iY.length
-    const func = function () {
-      var somefing2 = somefing.clone()
-      var runnerThing = new RunnerThing(iU, iV, somefing2, this)
+    return function initiateInnerr () {
+      var registers2 = registers.clone()
+      var vm = new VM(iU, iV, registers2, this)
       var jg = Math.min(arguments.length, jb)
       if (iZ) {
-        somefing2.clear(ja)
-        somefing2.set(ja, arguments)
+        registers2.clear(ja)
+        registers2.set(ja, arguments)
       }
       for (var je = 0; je < iX.length; ++je) {
-        somefing2.clear(iX[je])
+        registers2.clear(iX[je])
       }
       for (var je = 0; je < jg; ++je) {
-        somefing2.set(iY[je], arguments[je])
+        registers2.set(iY[je], arguments[je])
       }
       for (var je = jg; je < jb; ++je) {
-        somefing2.set(iY[je], undefined)
+        registers2.set(iY[je], undefined)
       }
-      return initiateInner(runnerThing)
+      return initiateInner(vm)
     }
-
-    return func
-    // if arity is higher maybe return this. but I think it's the same thing
-    // return function () {
-    //   return func.apply(this, arguments)
-    // }
   }
-  function initiateInner (runnerThing) {
+  function initiateInner (vm) {
     for (;;) {
-      if (globalUnknown1 !== d) {
-        var unknownC = globalUnknown1
-        globalUnknown1 = d
-        return unknownC
+      if (globalReturnValue !== CONTINUE) {
+        var returnValue = globalReturnValue
+        globalReturnValue = CONTINUE
+        return returnValue
       }
-      var unknownB = runnerThing.P()
-      // keith: uncomment this line to run it
-      // console.log(runnerThing.stack)
-      if (runnerThing.stack3.length === 0) {
-        commands[unknownB](runnerThing)
+      var unknownB = vm.P()
+      if (vm.stack3.length === 0) {
+        commands[unknownB](vm)
       } else {
-        tryToRun(commands[unknownB], runnerThing)
+        tryToRun(commands[unknownB], vm)
       }
     }
   }
